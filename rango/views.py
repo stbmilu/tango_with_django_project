@@ -5,7 +5,9 @@ from rango.models import Category
 from rango.models import Page
 
 from rango.forms import CategoryForm
+from rango.forms import PageForm
 from django.shortcuts import redirect
+from django.urls import reverse
 
 
 def index(request):
@@ -80,8 +82,7 @@ def add_category(request):
         if form.is_valid():
             # Save the new category to database.
             form.save(commit=True)
-            # The category is saved, we can confirm this.
-            # For now, just redirect the user back to the index view.
+            # The category is saved, and send user back to index page 
             return redirect('/rango/')
         else:
             # The supplied form contained errors
@@ -91,3 +92,32 @@ def add_category(request):
     # Will handle the bad form, new form, or no form supplied cases.
     # Render the form with error messages (if any).
     return render(request, 'rango/add_category.html', {'form': form})
+
+
+def add_page(request, category_name_slug):
+    try:
+        category = Category.objects.get(slug=category_name_slug)
+    except Category.DoesNotExist:
+        category = None
+
+    if category is None:
+        return redirect('/rango/')
+
+    form = PageForm()
+    if request.method == 'POST':
+        form = PageForm(request.POST)
+        
+        if form.is_valid():
+            if category:
+                #ensure that the page haven't been passed to database through commit = False?
+                page = form.save(commit=False)
+                page.category = category
+                page.views = 0
+                page.save()
+                return redirect(reverse('rango:show_category', kwargs={'category_name_slug':
+                                                                        category_name_slug}))
+        else:
+            print(form.errors)
+
+    context_dict = {'form': form, 'category': category}
+    return render(request, 'rango/add_page.html', context=context_dict)
