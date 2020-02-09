@@ -3,11 +3,11 @@ from django.http import HttpResponse
 
 from rango.models import Category
 from rango.models import Page
-
-from rango.forms import CategoryForm
-from rango.forms import PageForm
 from django.shortcuts import redirect
 from django.urls import reverse
+from rango.forms import CategoryForm, PageForm, UserForm, UserProfileForm
+from django.contrib.auth import authenticate, login, logout
+from django.cintrib.auth.decorators import login_required
 
 
 def index(request):
@@ -121,3 +121,79 @@ def add_page(request, category_name_slug):
 
     context_dict = {'form': form, 'category': category}
     return render(request, 'rango/add_page.html', context=context_dict)
+
+
+def register(request):
+    # Set False initially, changes to True when registration succeeds.
+    registered = False
+    
+    if request.method == 'POST':
+        # Attempt to grap the raw form information, both UserForm and UserProfileForm.
+        user_form = UserForm(request.POST)
+        profile_form = UserProfileForm(request.POST)
+
+        if user_form.is_valid() and profile_form.is_valid():
+            user = user_form.save()
+            # Hash the password, and update the user object
+            user.set_password(user.password)
+            user.save()
+            # The commit = False delays saving the model until we avoid the integrity problems
+            profile = profile_form.save(commit=False)
+            profile.user = user
+
+            # if user provide a picture, we get it from input form, put it in UserProfile model
+            if 'picture' in request.FILES:
+                profile.picture = request.FILES['picture']
+
+            profile.save()
+
+            # Update the status of registered variable
+            registered = True
+        else:
+            # Invalid form or forms - mistakes or something? print it in the terminal.
+            print(user_form.errors, profile_form.errors)
+    else:
+        # Not a HTTP POST, so render the forms, these forms will be blank for user input.
+        user_form = UserForm()
+        profile_form = UserProfileForm()
+
+    # Render depending on the status or forms
+    return render(request, 'rango/register.html', context = {'user_form': user_form, 
+                                                             'profile_form': profile_form, 
+                                                             'registered': registered})
+
+def user_login(request):
+    # try to pull out the information
+    if request.method == 'POST':
+        # from the login form, request.POST.get('') returns none if none while
+        # request.POST[''] raise a keyError exception
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+
+        # if username and password combination is valid return a user object
+        # Django machinery
+        user = authenticate(username=username, password=password)
+
+        if user:
+            # check the account have been disabled or not
+            if user.is_active:
+                login(request, user)
+                return redirect(reverse('rango:index'))
+            else:
+                return HttpResponse("Your Rango account is disabled.")
+        else:
+            print(f"Invalid login details: {username}, {password}")
+            return HttpResponse("Invalid login details supplied.")
+    # The request is not a Http post, display the login form, a http GET?
+    else:
+        return render(request, 'rango/login.html')
+
+@login_required
+def restricted(request):
+    return HttpResponse("Since you're logged in, you can see this text!")
+
+
+@login_required
+def user_logout(request):
+    logout(request)
+    return redirect(reverse('rango:index'))
