@@ -9,7 +9,7 @@
         </li>
         {% else %}
         <li>
-            <a href="{% url 'rango:show_category' c.slug%}">{{ c.slug }}</a>
+            <a href="{% url 'rango:show_category' c.slug%}">{{ c.name }}</a>
         </li>
         {% endif %}
     {% endfor %}

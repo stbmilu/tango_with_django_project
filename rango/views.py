@@ -1,6 +1,5 @@
 from django.shortcuts import render
 from django.http import HttpResponse
-
 from rango.models import Category
 from rango.models import Page
 from django.shortcuts import redirect
@@ -8,6 +7,8 @@ from django.urls import reverse
 from rango.forms import CategoryForm, PageForm, UserForm, UserProfileForm
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from datetime import datetime
+
 
 
 def index(request):
@@ -29,20 +30,32 @@ def index(request):
     context_dict['boldmessage'] = 'Crunchy, creamy, cookie, candy, cupcake!'
     context_dict['categories'] = category_list
     context_dict['pages'] = page_list
-
+    # Add set_test method
+    # request.session.set_test_cookie()
 
     # Return a rendered response to send to the client.
     # We make use of the shortcut function to make our lives easier.
     # Note that the first parameter is the template we wish to use.
     # could i mix up the qotation marks here as the propose to reduce similarity?
-    return render(request, "rango/index.html", context=context_dict)
+ 
+    visitor_cookie_handler(request)
+    response = render(request, "rango/index.html", context=context_dict)
+    return response
 
 def index2(request):
     return HttpResponse("Hello, my friend!")
 
 def about(request):
-    return render(request, "rango/about.html")
+    # Add test and delete test method
+    # if request.session.test_cookie_worked():
+        # print("TEST COOKIE WORKED!")
+        # request.session.delete_test_cookie()
+    context_dict = {}
+    visitor_cookie_handler(request)
+    context_dict['visits'] = request.session['visits']
+    response = render(request, 'rango/about.html', context=context_dict)
 
+    return response
 
 def show_category(request, category_name_slug):
     
@@ -199,3 +212,35 @@ def restricted(request):
 def user_logout(request):
     logout(request)
     return redirect(reverse('rango:index'))
+
+
+def get_server_side_cookie(request, cookie, default_val=None):
+    val = request.session.get(cookie)
+    if not val:
+        val = default_val
+    return val
+
+
+def visitor_cookie_handler(request):
+    # Get the number of visits to the site.
+    # Use the Cookies.get to obtain the visits cookie.
+    # If the cookie exists, the value returned is casted to an integer
+    # If the cookie doesn't exist, then the default value of 1 is used.
+    # visits = int(request.COOKIES.get('visits', '1'))
+    
+    visits = int(get_server_side_cookie(request, 'visits', '1'))
+    last_visit_cookie = get_server_side_cookie(request, 'last_visit', str(datetime.now()))
+    last_visit_time = datetime.strptime(last_visit_cookie[:-7], '%Y-%m-%d %H:%M:%S')
+
+    # If it is more than one day since last visit
+    if (datetime.now() - last_visit_time).days > 0:
+        visits = visits + 1
+        # Update the last visit cookie now that we have updated the count
+        request.session['last_visit'] = str(datetime.now())
+    else:
+        # Set the last visit cookie
+        request.session['last_visit'] = last_visit_cookie
+
+    # Update/set the visits cookie
+    request.session['visits'] = visits
+
